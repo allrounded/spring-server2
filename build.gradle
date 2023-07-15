@@ -1,0 +1,117 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '2.7.13'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'org.asciidoctor.jvm.convert' version "3.3.2"
+}
+
+group = 'team.allrounded'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '11'
+}
+
+configurations {
+    asciidoctorExtensions
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('springCloudVersion', "2021.0.5")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+dependencies {
+    //Web
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    //DB
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    //Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.rest-assured:rest-assured'
+    testCompileOnly 'org.projectlombok:lombok:'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    //Test Containers
+    testImplementation "org.testcontainers:junit-jupiter:1.17.2"
+    testImplementation "org.testcontainers:mysql:1.17.2"
+
+    //API Docs
+    testImplementation 'org.springframework.restdocs:spring-restdocs-restassured'
+    asciidoctorExtensions 'org.springframework.restdocs:spring-restdocs-asciidoctor'
+
+    //Dev
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    //AWS S3
+    implementation 'io.awspring.cloud:spring-cloud-starter-aws:2.4.2'
+    implementation 'com.amazonaws:aws-java-sdk-s3'
+    testImplementation 'io.findify:s3mock_2.13:0.2.6'
+
+    //Wire Mock
+    testImplementation "org.springframework.cloud:spring-cloud-starter-contract-stub-runner"
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+//API DOCS 관련 설정
+ext {
+    snippetsDir = file("${project.buildDir}/generated-snippets")
+}
+
+test {
+    outputs.dir snippetsDir
+    useJUnitPlatform()
+}
+
+asciidoctor {
+    dependsOn test
+    configurations 'asciidoctorExtensions'
+    inputs.dir snippetsDir
+
+    sources {
+        include '**/index.adoc'
+    }
+
+    baseDirFollowsSourceFile()
+}
+
+asciidoctor.doFirst {
+    delete file("${project.rootDir}/src/main/resources/static/docs")
+}
+
+task copyDocument(type: Copy) {
+    dependsOn asciidoctor
+
+    from "${project.buildDir}/docs/asciidoc"
+    into "${project.rootDir}/src/main/resources/static/docs"
+}
+
+bootJar {
+    dependsOn copyDocument
+    copy {
+        from "${project.buildDir}/docs/asciidoc"
+        into "${project.buildDir}/resources/main/static/docs"
+    }
+}
